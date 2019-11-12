@@ -2,9 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const _ = require('underscore');
 const counter = require('./counter');
+const Promise = require('bluebird');
 
 var items = {};
-
+const promisifiedReadFile = Promise.promisify(fs.readFile);
 // Public API - Fix these CRUD functions ///////////////////////////////////////
 
 exports.create = (text, callback) => {
@@ -35,11 +36,22 @@ exports.readAll = (callback) => {
     if (err) {
       console.log(err);
     }
-    var data = _.map(files, (file) => {
+
+    Promise.all(_.map(files, (file) => {
       var id = path.basename(file, '.txt');
-      return {id: id, text: id};
-    });
-    callback(null, data);
+      return new Promise((resolve, reject) => {
+        fs.readFile(path.join(exports.dataDir, file), (err, text) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve({id, text: text.toString()});
+          }
+        });
+      });
+      // return promisifiedReadFile(path.join(exports.dataDir, file)).then(text => {return {id, text: text.toString()}});
+    }
+    )).then(values => callback(null, values));
+    // Promise.all(data).then(values => callback(null, values));
   });
 };
 
